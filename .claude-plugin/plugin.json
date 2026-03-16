@@ -1,0 +1,20 @@
+{
+  "name": "outlook-connector",
+  "version": "0.1.0",
+  "description": "Connect Claude to Microsoft 365 email and calendar via Microsoft Graph API. Read, search, archive, and draft emails. View, create, and manage calendar events. Non-destructive by design — no delete, no send.",
+  "author": {
+    "name": "Brendan Erofeev"
+  },
+  "repository": "https://github.com/brendanerofeev/cowork-outlook-plugin",
+  "license": "MIT",
+  "keywords": [
+    "outlook",
+    "office365",
+    "microsoft365",
+    "email",
+    "calendar",
+    "graph-api",
+    "exchange"
+  ],
+  "mcpServers": "./.mcp.json"
+}

@@ -1,0 +1,40 @@
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { platform } from "node:process";
+import type { AppConfig } from "./types/config.js";
+
+const SCOPES = [
+  "offline_access",
+  "User.Read",
+  "Mail.ReadWrite",
+  "Calendars.ReadWrite",
+];
+
+function getTokenStorePath(): string {
+  const home = homedir();
+  switch (platform) {
+    case "win32":
+      return join(process.env.APPDATA || join(home, "AppData", "Roaming"), "cowork-outlook-mcp", "tokens.json");
+    case "darwin":
+      return join(home, "Library", "Application Support", "cowork-outlook-mcp", "tokens.json");
+    default:
+      return join(process.env.XDG_CONFIG_HOME || join(home, ".config"), "cowork-outlook-mcp", "tokens.json");
+  }
+}
+
+export const CLIENT_ID = "385c753e-f72b-45d2-94ca-568475184f6c";
+
+export function getConfig(): AppConfig {
+  const clientId = CLIENT_ID;
+  const tenantId = "common";
+
+  return {
+    clientId,
+    tenantId,
+    scopes: SCOPES,
+    tokenStorePath: getTokenStorePath(),
+  };
+}
+
+export const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
+export const AUTHORITY_BASE_URL = "https://login.microsoftonline.com";

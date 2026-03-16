@@ -1,0 +1,10 @@
+node_modules/
+build/
+dist/
+*.js.map
+*.d.ts.map
+.env
+.env.local
+*.token-cache.json
+coverage/
+.vitest/
