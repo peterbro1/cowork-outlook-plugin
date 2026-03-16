@@ -1,0 +1,79 @@
+name: Build and Release Plugin
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
+
+  build-plugin:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run build
+
+      # Assemble the plugin directory with only what's needed at runtime
+      - name: Assemble plugin
+        run: |
+          mkdir -p staging/outlook-connector/.claude-plugin
+          mkdir -p staging/outlook-connector/skills
+
+          # Plugin manifest and MCP config
+          cp .claude-plugin/plugin.json staging/outlook-connector/.claude-plugin/
+          cp .mcp.json staging/outlook-connector/
+
+          # Skills
+          cp -r skills/* staging/outlook-connector/skills/
+
+          # Compiled server and production dependencies
+          cp -r build staging/outlook-connector/
+          cp package.json staging/outlook-connector/
+          cp package-lock.json staging/outlook-connector/
+
+          # Install production deps only (no devDependencies)
+          cd staging/outlook-connector
+          npm ci --omit=dev
+
+          # README
+          cp ../../README.md .
+
+      # Create the .plugin zip
+      - name: Package .plugin
+        run: |
+          cd staging
+          zip -r ../outlook-connector.plugin outlook-connector/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: outlook-connector-plugin
+          path: outlook-connector.plugin
+
+      # Create GitHub release with the .plugin file
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: outlook-connector.plugin
+          generate_release_notes: true
