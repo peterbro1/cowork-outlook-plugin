@@ -91,43 +91,6 @@ export async function exchangeCodeForTokens(
 
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresAt: Date.now() + data.expires_in * 1000,
-    scope: data.scope,
-  };
-}
-
-/**
- * Refresh an expired access token using the refresh token (no client_secret).
- */
-export async function refreshToken(
-  config: AppConfig,
-  refreshTokenValue: string,
-): Promise<TokenCache> {
-  const url = `${AUTHORITY_BASE_URL}/${config.tenantId}/oauth2/v2.0/token`;
-  const body = new URLSearchParams({
-    client_id: config.clientId,
-    scope: config.scopes.join(" "),
-    refresh_token: refreshTokenValue,
-    grant_type: "refresh_token",
-  });
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-
-  if (!response.ok) {
-    const err = await response.json();
-    throw new OAuthError(err.error, err.error_description);
-  }
-
-  const data = (await response.json()) as TokenResponse;
-
-  return {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
     expiresAt: Date.now() + data.expires_in * 1000,
     scope: data.scope,
   };
@@ -140,11 +103,15 @@ const SUCCESS_HTML = `<!DOCTYPE html>
 <p>You can close this window and return to Claude.</p>
 </body></html>`;
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 const ERROR_HTML = (msg: string) => `<!DOCTYPE html>
 <html><head><title>Authentication Failed</title></head>
 <body style="font-family:sans-serif;text-align:center;padding:60px">
 <h1>Authentication Failed</h1>
-<p>${msg}</p>
+<p>${escapeHtml(msg)}</p>
 </body></html>`;
 
 /**
@@ -243,7 +210,7 @@ export async function startCallbackServer(
  *
  * @param config - App configuration
  * @param openBrowser - Function to open a URL in the browser (injected for testability)
- * @returns TokenCache with access + refresh tokens
+ * @returns TokenCache with the access token
  */
 export async function runAuthFlow(
   config: AppConfig,

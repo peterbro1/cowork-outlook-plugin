@@ -1,13 +1,11 @@
 import { GRAPH_BASE_URL } from "../config.js";
 import { getConfig } from "../config.js";
-import { loadTokens, saveTokens, isTokenExpired } from "./token-store.js";
-import { refreshToken as refreshTokenFn } from "./oauth.js";
+import { loadTokens, isTokenExpired } from "./token-store.js";
 import type { AppConfig, TokenCache } from "../types/config.js";
 
 export class GraphClient {
   private tokenStorePath: string;
   private config: AppConfig;
-  private refreshPromise: Promise<TokenCache> | null = null;
 
   constructor(tokenStorePath: string, config?: AppConfig) {
     this.tokenStorePath = tokenStorePath;
@@ -19,39 +17,17 @@ export class GraphClient {
 
     if (!tokens) {
       throw new Error(
-        "No tokens found. Please authenticate first using the device code flow.",
+        "Not authenticated. Please run o365_login to sign in.",
       );
     }
 
     if (isTokenExpired(tokens)) {
-      // If a refresh is already in flight, wait for it
-      if (this.refreshPromise) {
-        return this.refreshPromise;
-      }
-
-      // Start refresh and store the promise
-      this.refreshPromise = this.performRefresh(tokens.refreshToken);
-      try {
-        const newTokens = await this.refreshPromise;
-        return newTokens;
-      } finally {
-        this.refreshPromise = null;
-      }
+      throw new Error(
+        "Session expired. Please run o365_login to sign in again.",
+      );
     }
 
     return tokens;
-  }
-
-  private async performRefresh(refreshTokenValue: string): Promise<TokenCache> {
-    try {
-      const newTokens = await refreshTokenFn(this.config, refreshTokenValue);
-      await saveTokens(newTokens, this.tokenStorePath);
-      return newTokens;
-    } catch (error) {
-      throw new Error(
-        "Failed to refresh token. Please re-authenticate using the device code flow.",
-      );
-    }
   }
 
   private buildHeaders(accessToken: string): Record<string, string> {

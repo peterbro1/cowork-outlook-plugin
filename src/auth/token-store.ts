@@ -7,7 +7,7 @@ export async function saveTokens(
   filePath: string,
 ): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
-  await writeFile(filePath, JSON.stringify(tokenCache), "utf-8");
+  await writeFile(filePath, JSON.stringify(tokenCache), { encoding: "utf-8", mode: 0o600 });
 }
 
 export async function loadTokens(filePath: string): Promise<TokenCache | null> {

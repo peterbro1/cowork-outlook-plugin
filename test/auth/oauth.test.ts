@@ -7,7 +7,6 @@ import {
   generateState,
   buildAuthorizationUrl,
   exchangeCodeForTokens,
-  refreshToken,
   startCallbackServer,
   runAuthFlow,
   OAuthError,
@@ -17,7 +16,7 @@ import type { AppConfig } from "../../src/types/config.js";
 const TEST_CONFIG: AppConfig = {
   clientId: "test-client-id",
   tenantId: "test-tenant",
-  scopes: ["offline_access", "User.Read", "Mail.ReadWrite"],
+  scopes: ["User.Read", "Mail.ReadWrite"],
   tokenStorePath: "/tmp/test-tokens.json",
 };
 
@@ -67,7 +66,7 @@ describe("buildAuthorizationUrl", () => {
     expect(parsed.searchParams.get("response_type")).toBe("code");
     expect(parsed.searchParams.get("redirect_uri")).toBe("http://localhost:3000/callback");
     expect(parsed.searchParams.get("response_mode")).toBe("query");
-    expect(parsed.searchParams.get("scope")).toBe("offline_access User.Read Mail.ReadWrite");
+    expect(parsed.searchParams.get("scope")).toBe("User.Read Mail.ReadWrite");
     expect(parsed.searchParams.get("code_challenge")).toBe("test-challenge");
     expect(parsed.searchParams.get("code_challenge_method")).toBe("S256");
     expect(parsed.searchParams.get("state")).toBe("test-state");
@@ -91,9 +90,8 @@ describe("exchangeCodeForTokens", () => {
 
         return HttpResponse.json({
           access_token: "new-access-token",
-          refresh_token: "new-refresh-token",
           expires_in: 3600,
-          scope: "offline_access User.Read Mail.ReadWrite",
+          scope: "User.Read Mail.ReadWrite",
           token_type: "Bearer",
         });
       }),
@@ -107,9 +105,8 @@ describe("exchangeCodeForTokens", () => {
     );
 
     expect(tokens.accessToken).toBe("new-access-token");
-    expect(tokens.refreshToken).toBe("new-refresh-token");
     expect(tokens.expiresAt).toBeGreaterThan(Date.now());
-    expect(tokens.scope).toBe("offline_access User.Read Mail.ReadWrite");
+    expect(tokens.scope).toBe("User.Read Mail.ReadWrite");
   });
 
   it("throws OAuthError on failure", async () => {
@@ -128,43 +125,6 @@ describe("exchangeCodeForTokens", () => {
   });
 });
 
-describe("refreshToken", () => {
-  it("exchanges refresh token for new tokens", async () => {
-    mswServer.use(
-      http.post(TOKEN_URL, async ({ request }) => {
-        const body = await request.text();
-        const params = new URLSearchParams(body);
-        expect(params.get("grant_type")).toBe("refresh_token");
-        expect(params.get("refresh_token")).toBe("old-refresh-token");
-
-        return HttpResponse.json({
-          access_token: "refreshed-access-token",
-          refresh_token: "refreshed-refresh-token",
-          expires_in: 3600,
-          scope: "offline_access User.Read Mail.ReadWrite",
-          token_type: "Bearer",
-        });
-      }),
-    );
-
-    const tokens = await refreshToken(TEST_CONFIG, "old-refresh-token");
-    expect(tokens.accessToken).toBe("refreshed-access-token");
-    expect(tokens.refreshToken).toBe("refreshed-refresh-token");
-  });
-
-  it("throws OAuthError on invalid_grant", async () => {
-    mswServer.use(
-      http.post(TOKEN_URL, () => {
-        return HttpResponse.json(
-          { error: "invalid_grant", error_description: "Refresh token expired" },
-          { status: 400 },
-        );
-      }),
-    );
-
-    await expect(refreshToken(TEST_CONFIG, "expired-token")).rejects.toThrow(OAuthError);
-  });
-});
 
 describe("startCallbackServer", () => {
   it("resolves with the authorization code on valid callback", async () => {
@@ -224,9 +184,8 @@ describe("runAuthFlow", () => {
       http.post(TOKEN_URL, () => {
         return HttpResponse.json({
           access_token: "flow-access-token",
-          refresh_token: "flow-refresh-token",
           expires_in: 3600,
-          scope: "offline_access User.Read Mail.ReadWrite",
+          scope: "User.Read Mail.ReadWrite",
           token_type: "Bearer",
         });
       }),
@@ -256,6 +215,5 @@ describe("runAuthFlow", () => {
 
     // Verify tokens came back
     expect(tokens.accessToken).toBe("flow-access-token");
-    expect(tokens.refreshToken).toBe("flow-refresh-token");
   });
 });

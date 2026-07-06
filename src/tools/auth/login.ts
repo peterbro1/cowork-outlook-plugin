@@ -9,7 +9,7 @@ export function createLoginTool(
   return {
     name: "o365_login",
     description:
-      "Authenticate with Microsoft 365. Opens a browser window for the user to sign in. Tokens are stored locally and refresh automatically.",
+      "Authenticate with Microsoft 365. Opens a browser window for the user to sign in. The session token is stored locally and is valid for one hour; run this tool again when it expires.",
     inputSchema: { type: "object", properties: {}, required: [] },
     handler: async () => {
       const config = getConfig();

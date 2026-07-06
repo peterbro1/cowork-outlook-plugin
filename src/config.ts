@@ -4,7 +4,6 @@ import { platform } from "node:process";
 import type { AppConfig } from "./types/config.js";
 
 const SCOPES = [
-  "offline_access",
   "User.Read",
   "Mail.ReadWrite",
   "Calendars.ReadWrite",

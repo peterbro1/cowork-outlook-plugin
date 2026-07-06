@@ -13,7 +13,6 @@ import type { TokenCache } from "../../src/types/config.js";
 function makeTokenCache(overrides: Partial<TokenCache> = {}): TokenCache {
   return {
     accessToken: "access-123",
-    refreshToken: "refresh-456",
     expiresAt: Date.now() + 3600_000,
     scope: "User.Read Mail.ReadWrite",
     ...overrides,

@@ -11,12 +11,11 @@ import type { AppConfig, TokenCache } from "../../src/types/config.js";
 const TEST_CONFIG: AppConfig = {
   clientId: "test-client-id",
   tenantId: "test-tenant-id",
-  scopes: ["User.Read", "Mail.ReadWrite", "offline_access"],
+  scopes: ["User.Read", "Mail.ReadWrite"],
   tokenStorePath: "/tmp/tokens.json",
 };
 
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
-const TOKEN_URL = "https://login.microsoftonline.com/test-tenant-id/oauth2/v2.0/token";
 
 const server = setupServer();
 
@@ -27,7 +26,6 @@ afterAll(() => server.close());
 function makeTokenCache(overrides: Partial<TokenCache> = {}): TokenCache {
   return {
     accessToken: "test-access-token",
-    refreshToken: "test-refresh-token",
     expiresAt: Date.now() + 3600_000,
     scope: "User.Read Mail.ReadWrite",
     ...overrides,
@@ -122,101 +120,21 @@ describe("GraphClient", () => {
     });
   });
 
-  describe("auto-refresh", () => {
-    it("refreshes expired token before making request", async () => {
-      const client = await setupClient({ expiresAt: Date.now() - 10_000 });
-
-      server.use(
-        http.post(TOKEN_URL, () => {
-          return HttpResponse.json({
-            access_token: "refreshed-access-token",
-            refresh_token: "refreshed-refresh-token",
-            expires_in: 3600,
-            scope: "User.Read Mail.ReadWrite",
-            token_type: "Bearer",
-          });
-        }),
-        http.get(`${GRAPH_BASE}/me`, ({ request }) => {
-          const auth = request.headers.get("Authorization");
-          return HttpResponse.json({ token: auth });
-        }),
-      );
-
-      const data = await client.get("/me");
-      expect(data.token).toBe("Bearer refreshed-access-token");
-    });
-  });
-
   describe("no tokens", () => {
     it("throws when no tokens are available", async () => {
       tempDir = await mkdtemp(join(tmpdir(), "graph-client-"));
       tokenPath = join(tempDir, "tokens.json");
       const client = new GraphClient(tokenPath, TEST_CONFIG);
 
-      await expect(client.get("/me")).rejects.toThrow("No tokens found");
+      await expect(client.get("/me")).rejects.toThrow("Not authenticated");
     });
   });
 
-  describe("concurrent refresh", () => {
-    it("multiple concurrent requests share a single token refresh", async () => {
-      const client = await setupClient({ expiresAt: Date.now() - 10_000 });
-      let refreshCallCount = 0;
-
-      server.use(
-        http.post(TOKEN_URL, async () => {
-          refreshCallCount++;
-          await new Promise((r) => setTimeout(r, 50));
-          return HttpResponse.json({
-            access_token: "refreshed-token",
-            refresh_token: "new-refresh-token",
-            expires_in: 3600,
-            scope: "User.Read Mail.ReadWrite",
-            token_type: "Bearer",
-          });
-        }),
-        http.get(`${GRAPH_BASE}/me`, ({ request }) => {
-          return HttpResponse.json({ auth: request.headers.get("Authorization") });
-        }),
-      );
-
-      const [r1, r2, r3] = await Promise.all([
-        client.get("/me"),
-        client.get("/me"),
-        client.get("/me"),
-      ]);
-
-      expect(refreshCallCount).toBe(1);
-      expect(r1.auth).toBe("Bearer refreshed-token");
-      expect(r2.auth).toBe("Bearer refreshed-token");
-      expect(r3.auth).toBe("Bearer refreshed-token");
-    });
-
-    it("second concurrent request waits for first refresh", async () => {
+  describe("expired token", () => {
+    it("throws and prompts re-login when token is expired", async () => {
       const client = await setupClient({ expiresAt: Date.now() - 10_000 });
 
-      server.use(
-        http.post(TOKEN_URL, async () => {
-          await new Promise((r) => setTimeout(r, 100));
-          return HttpResponse.json({
-            access_token: "delayed-refreshed-token",
-            refresh_token: "new-refresh-token",
-            expires_in: 3600,
-            scope: "User.Read Mail.ReadWrite",
-            token_type: "Bearer",
-          });
-        }),
-        http.get(`${GRAPH_BASE}/me`, ({ request }) => {
-          return HttpResponse.json({ auth: request.headers.get("Authorization") });
-        }),
-      );
-
-      const [r1, r2] = await Promise.all([
-        client.get("/me"),
-        client.get("/me"),
-      ]);
-
-      expect(r1.auth).toBe("Bearer delayed-refreshed-token");
-      expect(r2.auth).toBe("Bearer delayed-refreshed-token");
+      await expect(client.get("/me")).rejects.toThrow("Session expired");
     });
   });
 
